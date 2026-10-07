@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Data Compression Tools</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/style.css') }}"
+    >
+</head>
+
+<body>
+
+    <nav>
+
+        <div class="logo">
+            Data Compression Tools
+        </div>
+
+        <div class="nav-menu">
+
+            <a href="{{ url_for('dashboard') }}">
+                Home
+            </a>
+
+            <a href="{{ url_for('compress_page') }}">
+                Compress PDF
+            </a>
+
+        </div>
+
+    </nav>
+
+
+    <main class="container">
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+
+            {% if messages %}
+
+                {% for category, message in messages %}
+
+                    <div class="flash">
+                        {{ message }}
+                    </div>
+
+                {% endfor %}
+
+            {% endif %}
+
+        {% endwith %}
+
+
+        {% block content %}
+        {% endblock %}
+
+    </main>
+
+</body>
+
+</html>

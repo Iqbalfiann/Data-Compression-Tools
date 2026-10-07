@@ -1,0 +1,522 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="compress-page">
+
+    <!-- HEADER -->
+
+    <div class="page-header">
+
+        <h1>
+            Compress PDF
+        </h1>
+
+        <p>
+            Kurangi ukuran file PDF dengan mudah
+            dan tetap dalam format PDF.
+        </p>
+
+    </div>
+
+
+    <!-- UPLOAD CARD -->
+
+    <div class="upload-card">
+
+        <div class="upload-icon">
+            📄
+        </div>
+
+        <h2>
+            Compress PDF
+        </h2>
+
+        <p class="upload-description">
+            Drag & Drop file PDF ke kotak di bawah
+            atau pilih file dari komputer.
+        </p>
+
+
+        <form
+            action="{{ url_for('compress_process') }}"
+            method="POST"
+            enctype="multipart/form-data"
+            id="upload-form"
+        >
+
+            <!-- DRAG & DROP AREA -->
+
+            <label
+                for="file"
+                class="file-upload"
+                id="drop-area"
+            >
+
+                <span class="upload-text">
+                    Drag & Drop PDF di sini
+                </span>
+
+                <span class="upload-subtext">
+                    atau klik untuk memilih file
+                </span>
+
+                <input
+                    type="file"
+                    id="file"
+                    name="file"
+                    accept=".pdf,application/pdf"
+                    required
+                >
+
+                <div id="selected-file">
+                    Belum ada file yang dipilih
+                </div>
+
+            </label>
+
+
+            <!-- COMPRESS BUTTON -->
+
+            <button
+                type="submit"
+                class="compress-button"
+                id="compress-button"
+            >
+                Compress PDF
+            </button>
+
+
+            <!-- LOADING PROCESS -->
+
+            <div
+                class="compression-loading"
+                id="compression-loading"
+            >
+
+                <div class="loading-icon">
+                    ⚙️
+                </div>
+
+                <h3>
+                    Compressing PDF...
+                </h3>
+
+                <p id="loading-text">
+                    Sedang mempersiapkan file...
+                </p>
+
+
+                <div class="progress-container">
+
+                    <div
+                        class="progress-bar"
+                        id="progress-bar"
+                    ></div>
+
+                </div>
+
+
+                <div
+                    class="progress-percent"
+                    id="progress-percent"
+                >
+                    0%
+                </div>
+
+            </div>
+
+        </form>
+
+    </div>
+
+
+    <!-- RESULT -->
+
+    {% if result %}
+
+    <div class="result-card">
+
+        <div class="success-title">
+            Compression Berhasil
+        </div>
+
+
+        <div class="result-info">
+
+
+            <div class="result-item">
+
+                <span>
+                    File
+                </span>
+
+                <strong>
+                    {{ result.file_name }}
+                </strong>
+
+            </div>
+
+
+            <div class="result-item">
+
+                <span>
+                    Ukuran Awal
+                </span>
+
+                <strong>
+                    {{ result.original_size }}
+                </strong>
+
+            </div>
+
+
+            <div class="result-item">
+
+                <span>
+                    Ukuran Setelah Kompresi
+                </span>
+
+                <strong>
+                    {{ result.compressed_size }}
+                </strong>
+
+            </div>
+
+
+            <div class="result-item">
+
+                <span>
+                    Compression Ratio
+                </span>
+
+                <strong>
+                    {{ result.compression_ratio }}
+                </strong>
+
+            </div>
+
+
+            <div class="result-item">
+
+                <span>
+                    Space Saved
+                </span>
+
+                <strong>
+                    {{ result.space_saved }}%
+                </strong>
+
+            </div>
+
+
+            <div class="result-item">
+
+                <span>
+                    Waktu Proses
+                </span>
+
+                <strong>
+                    {{ result.processing_time }}
+                </strong>
+
+            </div>
+
+
+        </div>
+
+
+        <!-- DOWNLOAD -->
+
+        <a
+            href="{{ url_for('download_file', filename=result.output) }}"
+            class="download-button"
+        >
+            Download PDF
+        </a>
+
+    </div>
+
+    {% endif %}
+
+</div>
+
+
+<script>
+
+/* ==========================================================
+   ELEMENT
+========================================================== */
+
+const dropArea = document.getElementById("drop-area");
+
+const fileInput = document.getElementById("file");
+
+const selectedFile =
+    document.getElementById("selected-file");
+
+const uploadForm =
+    document.getElementById("upload-form");
+
+const compressButton =
+    document.getElementById("compress-button");
+
+const loading =
+    document.getElementById("compression-loading");
+
+const progressBar =
+    document.getElementById("progress-bar");
+
+const progressPercent =
+    document.getElementById("progress-percent");
+
+const loadingText =
+    document.getElementById("loading-text");
+
+
+/* ==========================================================
+   PILIH FILE DENGAN KLIK
+========================================================== */
+
+fileInput.addEventListener("change", function () {
+
+    if (this.files.length > 0) {
+
+        handleFile(this.files[0]);
+
+    }
+
+});
+
+
+/* ==========================================================
+   DRAG OVER
+========================================================== */
+
+dropArea.addEventListener(
+    "dragover",
+    function (event) {
+
+        event.preventDefault();
+
+        dropArea.classList.add("drag-over");
+
+    }
+);
+
+
+/* ==========================================================
+   DRAG LEAVE
+========================================================== */
+
+dropArea.addEventListener(
+    "dragleave",
+    function () {
+
+        dropArea.classList.remove("drag-over");
+
+    }
+);
+
+
+/* ==========================================================
+   DROP
+========================================================== */
+
+dropArea.addEventListener(
+    "drop",
+    function (event) {
+
+        event.preventDefault();
+
+        dropArea.classList.remove("drag-over");
+
+
+        const files =
+            event.dataTransfer.files;
+
+
+        if (files.length > 0) {
+
+            const file = files[0];
+
+
+            if (
+                file.type === "application/pdf" ||
+                file.name.toLowerCase().endsWith(".pdf")
+            ) {
+
+                fileInput.files = files;
+
+                handleFile(file);
+
+            } else {
+
+                selectedFile.textContent =
+                    "❌ File harus berformat PDF.";
+
+            }
+
+        }
+
+    }
+);
+
+
+/* ==========================================================
+   HANDLE FILE
+========================================================== */
+
+function handleFile(file) {
+
+    if (
+        file.type !== "application/pdf" &&
+        !file.name.toLowerCase().endsWith(".pdf")
+    ) {
+
+        selectedFile.textContent =
+            "❌ File harus berformat PDF.";
+
+        fileInput.value = "";
+
+        return;
+
+    }
+
+
+    selectedFile.textContent =
+        "📄 " + file.name;
+
+}
+
+
+/* ==========================================================
+   SUBMIT / COMPRESS
+========================================================== */
+
+uploadForm.addEventListener(
+    "submit",
+    function () {
+
+        /*
+         * Tampilkan loading
+         */
+
+        loading.classList.add("show");
+
+
+        /*
+         * Nonaktifkan tombol
+         */
+
+        compressButton.disabled = true;
+
+        compressButton.textContent =
+            "Processing...";
+
+
+        /*
+         * Progress awal
+         */
+
+        let progress = 0;
+
+
+        /*
+         * Pesan proses
+         */
+
+        const loadingMessages = [
+
+            "Membaca file PDF...",
+
+            "Menganalisis isi PDF...",
+
+            "Mengoptimasi gambar...",
+
+            "Mengompres content stream...",
+
+            "Membersihkan object PDF...",
+
+            "Mengoptimasi metadata...",
+
+            "Mengoptimasi struktur PDF...",
+
+            "Menyimpan hasil kompresi..."
+
+        ];
+
+
+        let messageIndex = 0;
+
+
+        /*
+         * Animasi progress
+         *
+         * Berhenti di 90%.
+         * 100% setelah server selesai.
+         */
+
+        const progressInterval =
+            setInterval(
+                function () {
+
+
+                    if (progress < 90) {
+
+                        progress +=
+                            Math.random() * 3;
+
+
+                        if (progress > 90) {
+
+                            progress = 90;
+
+                        }
+
+
+                        progressBar.style.width =
+                            progress + "%";
+
+
+                        progressPercent.textContent =
+                            Math.floor(progress) + "%";
+
+                    }
+
+
+                    /*
+                     * Ganti pesan
+                     */
+
+                    if (
+                        progress >
+                        (messageIndex + 1) * 10
+                    ) {
+
+                        if (
+                            messageIndex <
+                            loadingMessages.length
+                        ) {
+
+                            loadingText.textContent =
+                                loadingMessages[
+                                    messageIndex
+                                ];
+
+                            messageIndex++;
+
+                        }
+
+                    }
+
+                },
+                250
+            );
+
+    }
+);
+
+</script>
+
+{% endblock %}

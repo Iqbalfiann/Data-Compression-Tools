@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="home-page">
+
+
+    <!-- HERO -->
+
+    <div class="hero">
+
+        <div class="hero-badge">
+            PDF TOOLS
+        </div>
+
+        <h1>
+            Compress PDF
+        </h1>
+
+        <p>
+            Kurangi ukuran file PDF dengan cepat,
+            mudah, dan tetap dalam format PDF.
+        </p>
+
+        <a
+            href="{{ url_for('compress_page') }}"
+            class="hero-button"
+        >
+            Compress PDF
+        </a>
+
+    </div>
+
+
+    <!-- FEATURES -->
+
+    <div class="features">
+
+
+        <!-- EASY TO USE -->
+
+        <div class="feature-card">
+
+            <div class="feature-icon">
+                📄
+            </div>
+
+            <h3>
+                Easy to Use
+            </h3>
+
+            <p>
+                Upload file PDF dan lakukan kompresi
+                dengan beberapa klik saja.
+            </p>
+
+        </div>
+
+
+        <!-- PDF OUTPUT -->
+
+        <div class="feature-card">
+
+            <div class="feature-icon">
+                📦
+            </div>
+
+            <h3>
+                PDF Output
+            </h3>
+
+            <p>
+                File hasil kompresi tetap menggunakan
+                format PDF dan dapat langsung dibuka.
+            </p>
+
+        </div>
+
+
+        <!-- FAST PROCESSING -->
+
+        <div class="feature-card">
+
+            <div class="feature-icon">
+                ⚡
+            </div>
+
+            <h3>
+                Fast Processing
+            </h3>
+
+            <p>
+                Proses kompresi dilakukan langsung
+                melalui aplikasi.
+            </p>
+
+        </div>
+
+
+    </div>
+
+
+    <!-- START SECTION -->
+
+    <div class="start-section">
+
+        <h2>
+            Siap untuk mengompres PDF?
+        </h2>
+
+        <p>
+            Pilih file PDF dan mulai proses kompresi.
+        </p>
+
+        <a
+            href="{{ url_for('compress_page') }}"
+            class="hero-button"
+        >
+            Mulai Compress PDF
+        </a>
+
+    </div>
+
+
+</div>
+
+{% endblock %}
