@@ -514,6 +514,8 @@ nav a:hover {
     padding: 15px;
 
     border-radius: 8px;
+
+    min-width: 0;
 }
 
 .result-item span {
@@ -526,8 +528,25 @@ nav a:hover {
     margin-bottom: 5px;
 }
 
+
+/* =========================
+   RESULT TEXT
+========================= */
+
 .result-item strong {
+    display: block;
+
     color: #111827;
+
+    max-width: 100%;
+
+    overflow-wrap: anywhere;
+
+    word-break: break-word;
+
+    white-space: normal;
+
+    line-height: 1.5;
 }
 
 
