@@ -1,4 +1,9 @@
 
+import os
+import time
+import uuid
+import logging
+
 from flask import (
     Flask,
     render_template,
@@ -9,13 +14,20 @@ from flask import (
     send_from_directory
 )
 
-import os
-import time
-import uuid
-import logging
-
 from werkzeug.utils import secure_filename
 from compression.pdf_compressor import compress_file
+
+
+# ==========================================================
+# LOGGING
+# ==========================================================
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
+
+logger = logging.getLogger(__name__)
 
 
 # ==========================================================
@@ -32,33 +44,46 @@ app.config["SECRET_KEY"] = os.environ.get(
     "data-compression-development-key"
 )
 
-app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
-
-
-# Logging untuk membantu mendeteksi error deployment
-logging.basicConfig(level=logging.INFO)
+# Maksimal upload 4 MB untuk menghindari
+# batas payload Vercel Serverless Function.
+app.config["MAX_CONTENT_LENGTH"] = 4 * 1024 * 1024
 
 
 # ==========================================================
-# FOLDER CONFIGURATION
+# STORAGE CONFIGURATION - VERCEL
 # ==========================================================
 
-BASE_DIR = os.path.abspath(
-    os.path.dirname(__file__)
+BASE_DIR = os.path.dirname(
+    os.path.abspath(__file__)
+)
+
+# Gunakan /tmp karena direktori deployment Vercel
+# bersifat read-only.
+
+DATA_DIR = os.environ.get(
+    "DATA_DIR",
+    "/tmp/data_compression"
 )
 
 UPLOAD_FOLDER = os.path.join(
-    BASE_DIR,
+    DATA_DIR,
     "uploads"
 )
 
 OUTPUT_FOLDER = os.path.join(
-    BASE_DIR,
+    DATA_DIR,
     "output"
 )
 
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+os.makedirs(
+    UPLOAD_FOLDER,
+    exist_ok=True
+)
+
+os.makedirs(
+    OUTPUT_FOLDER,
+    exist_ok=True
+)
 
 
 # ==========================================================
@@ -79,6 +104,24 @@ def human_size(size):
     return f"{size:.2f} TB"
 
 
+def cleanup_file(file_path):
+
+    if not file_path:
+        return
+
+    try:
+
+        if os.path.isfile(file_path):
+            os.remove(file_path)
+
+    except OSError:
+
+        logger.exception(
+            "Gagal menghapus file: %s",
+            file_path
+        )
+
+
 # ==========================================================
 # HOME
 # ==========================================================
@@ -86,7 +129,9 @@ def human_size(size):
 @app.route("/")
 def dashboard():
 
-    return render_template("index.html")
+    return render_template(
+        "index.html"
+    )
 
 
 # ==========================================================
@@ -96,70 +141,155 @@ def dashboard():
 @app.route("/compress")
 def compress_page():
 
-    return render_template("compress.html")
+    return render_template(
+        "compress.html"
+    )
 
 
 # ==========================================================
 # PROCESS COMPRESS
 # ==========================================================
 
-@app.route("/compress/process", methods=["POST"])
+@app.route(
+    "/compress/process",
+    methods=["POST"]
+)
 def compress_process():
 
-    # Memastikan file tersedia
-    if "file" not in request.files:
-
-        flash("File belum dipilih.", "error")
-
-        return redirect(url_for("compress_page"))
-
-    file = request.files["file"]
-
-    if not file or file.filename == "":
-
-        flash("File belum dipilih.", "error")
-
-        return redirect(url_for("compress_page"))
-
-    # Mengamankan nama file
-    filename = secure_filename(file.filename)
-
-    if not filename:
-
-        flash("Nama file tidak valid.", "error")
-
-        return redirect(url_for("compress_page"))
-
-    # Memastikan format PDF
-    if not filename.lower().endswith(".pdf"):
-
-        flash("File harus berformat PDF.", "error")
-
-        return redirect(url_for("compress_page"))
-
-    # Membuat nama file unik agar tidak bentrok
-    unique_id = uuid.uuid4().hex[:12]
-
-    stored_name = f"{unique_id}_{filename}"
-
-    output_name = f"compressed_{unique_id}_{filename}"
-
-    input_path = os.path.join(
-        UPLOAD_FOLDER,
-        stored_name
-    )
-
-    output_path = os.path.join(
-        OUTPUT_FOLDER,
-        output_name
-    )
+    input_path = None
+    output_path = None
 
     try:
 
-        # Menyimpan file upload
-        file.save(input_path)
+        # --------------------------------------------------
+        # 1. VALIDASI FILE
+        # --------------------------------------------------
 
-        # Memulai proses kompresi
+        if "file" not in request.files:
+
+            flash(
+                "File belum dipilih.",
+                "error"
+            )
+
+            return redirect(
+                url_for("compress_page")
+            )
+
+        file = request.files["file"]
+
+        if not file or not file.filename:
+
+            flash(
+                "File belum dipilih.",
+                "error"
+            )
+
+            return redirect(
+                url_for("compress_page")
+            )
+
+        filename = secure_filename(
+            file.filename
+        )
+
+        if not filename:
+
+            flash(
+                "Nama file tidak valid.",
+                "error"
+            )
+
+            return redirect(
+                url_for("compress_page")
+            )
+
+        # --------------------------------------------------
+        # 2. VALIDASI FORMAT PDF
+        # --------------------------------------------------
+
+        if not filename.lower().endswith(".pdf"):
+
+            flash(
+                "File harus berformat PDF.",
+                "error"
+            )
+
+            return redirect(
+                url_for("compress_page")
+            )
+
+        # --------------------------------------------------
+        # 3. BUAT NAMA FILE UNIK
+        # --------------------------------------------------
+
+        unique_id = uuid.uuid4().hex
+
+        stored_name = (
+            f"{unique_id}_{filename}"
+        )
+
+        output_name = (
+            f"compressed_{unique_id}_{filename}"
+        )
+
+        input_path = os.path.join(
+            UPLOAD_FOLDER,
+            stored_name
+        )
+
+        output_path = os.path.join(
+            OUTPUT_FOLDER,
+            output_name
+        )
+
+        # --------------------------------------------------
+        # 4. SIMPAN FILE UPLOAD
+        # --------------------------------------------------
+
+        file.save(
+            input_path
+        )
+
+        if not os.path.isfile(input_path):
+
+            raise RuntimeError(
+                "File upload gagal disimpan."
+            )
+
+        original_file_size = os.path.getsize(
+            input_path
+        )
+
+        if original_file_size == 0:
+
+            raise ValueError(
+                "File PDF kosong."
+            )
+
+        # --------------------------------------------------
+        # 5. VALIDASI HEADER PDF
+        # --------------------------------------------------
+
+        with open(input_path, "rb") as pdf_file:
+
+            header = pdf_file.read(1024)
+
+        if b"%PDF-" not in header:
+
+            raise ValueError(
+                "File bukan PDF yang valid."
+            )
+
+        # --------------------------------------------------
+        # 6. PROSES KOMPRESI
+        # --------------------------------------------------
+
+        logger.info(
+            "Memulai kompresi PDF: %s",
+            filename
+        )
+
         start_time = time.perf_counter()
 
         result = compress_file(
@@ -171,19 +301,56 @@ def compress_process():
             time.perf_counter() - start_time
         )
 
-        # Memastikan hasil kompresi tersedia
+        # --------------------------------------------------
+        # 7. VALIDASI HASIL KOMPRESI
+        # --------------------------------------------------
+
+        if not isinstance(result, dict):
+
+            raise RuntimeError(
+                "Hasil kompresi tidak valid."
+            )
+
+        original_size = result.get(
+            "original_size"
+        )
+
+        compressed_size = result.get(
+            "compressed_size"
+        )
+
+        if original_size is None or compressed_size is None:
+
+            raise RuntimeError(
+                "Informasi ukuran PDF tidak lengkap."
+            )
+
         if not os.path.isfile(output_path):
 
             raise RuntimeError(
                 "File hasil kompresi tidak ditemukan."
             )
 
-        # Mengambil ukuran file
-        original_size = result["original_size"]
+        actual_compressed_size = os.path.getsize(
+            output_path
+        )
 
-        compressed_size = result["compressed_size"]
+        if actual_compressed_size == 0:
 
-        # Menghitung rasio kompresi
+            raise RuntimeError(
+                "File hasil kompresi kosong."
+            )
+
+        if actual_compressed_size != compressed_size:
+
+            raise RuntimeError(
+                "Ukuran file hasil kompresi tidak sesuai."
+            )
+
+        # --------------------------------------------------
+        # 8. HITUNG RASIO KOMPRESI
+        # --------------------------------------------------
+
         if original_size > 0:
 
             compression_ratio = (
@@ -200,7 +367,17 @@ def compress_process():
             compression_ratio = 0
             space_saved = 0
 
-        # Menampilkan hasil
+        logger.info(
+            "Kompresi berhasil: %s | Original: %s | Compressed: %s",
+            filename,
+            original_size,
+            compressed_size
+        )
+
+        # --------------------------------------------------
+        # 9. TAMPILKAN HASIL
+        # --------------------------------------------------
+
         return render_template(
 
             "compress.html",
@@ -237,23 +414,14 @@ def compress_process():
 
     except Exception:
 
-        # Mencatat error lengkap di deployment logs
-        app.logger.exception(
+        logger.exception(
             "Terjadi kesalahan saat memproses PDF."
         )
 
-        # Menghapus file output jika proses gagal
-        if os.path.exists(output_path):
-
-            try:
-                os.remove(output_path)
-            except OSError:
-                app.logger.warning(
-                    "Gagal menghapus file output sementara."
-                )
+        cleanup_file(output_path)
 
         flash(
-            "Gagal memproses PDF. Silakan coba file lain.",
+            "Gagal memproses PDF. Silakan coba lagi.",
             "error"
         )
 
@@ -263,31 +431,59 @@ def compress_process():
 
     finally:
 
-        # Menghapus file upload sementara
-        if os.path.exists(input_path):
-
-            try:
-                os.remove(input_path)
-            except OSError:
-                app.logger.warning(
-                    "Gagal menghapus file upload sementara."
-                )
+        # Hapus file upload setelah proses selesai.
+        cleanup_file(input_path)
 
 
 # ==========================================================
 # DOWNLOAD PDF
 # ==========================================================
 
-@app.route("/download/<path:filename>")
+@app.route(
+    "/download/<path:filename>"
+)
 def download_file(filename):
+
+    safe_filename = secure_filename(
+        filename
+    )
+
+    if not safe_filename or safe_filename != filename:
+
+        flash(
+            "Nama file tidak valid.",
+            "error"
+        )
+
+        return redirect(
+            url_for("compress_page")
+        )
+
+    file_path = os.path.join(
+        OUTPUT_FOLDER,
+        safe_filename
+    )
+
+    if not os.path.isfile(file_path):
+
+        flash(
+            "File hasil kompresi tidak ditemukan atau sudah kedaluwarsa.",
+            "error"
+        )
+
+        return redirect(
+            url_for("compress_page")
+        )
 
     return send_from_directory(
 
         OUTPUT_FOLDER,
 
-        filename,
+        safe_filename,
 
-        as_attachment=True
+        as_attachment=True,
+
+        download_name=safe_filename
 
     )
 
@@ -313,12 +509,25 @@ def health_check():
 def file_too_large(error):
 
     flash(
-        "Ukuran file terlalu besar. Maksimal 50 MB.",
+        "Ukuran file terlalu besar. Maksimal upload 4 MB.",
         "error"
     )
 
     return redirect(
         url_for("compress_page")
+    )
+
+
+@app.errorhandler(500)
+def internal_server_error(error):
+
+    logger.exception(
+        "Internal Server Error."
+    )
+
+    return (
+        "Terjadi kesalahan pada server.",
+        500
     )
 
 
